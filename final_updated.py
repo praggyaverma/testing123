@@ -1,15 +1,40 @@
 import pymupdf
 import statistics
 
-def split_into_chunks(title, text, max_words):
+import re
+
+def split_into_chunks(title, text, max_words=300):
     words = text.split()
     chunks = []
-    for i in range(0, len(words), max_words):
-        chunk_words = words[i:i + max_words]
-        chunk = " ".join(chunk_words)
-        chunk_title = title if i == 0 else f"{title} (cont. {i // max_words + 1})"
-        chunks.append((chunk_title, chunk))
+    i = 0
+
+    while i < len(words):
+        end = min(i + max_words, len(words))
+        chunk_words = words[i:end]
+        chunk_text = " ".join(chunk_words)
+
+        # Try to find nearest sentence boundary or line break before max_words
+        match = re.search(r"(?s)^(.+?)(?:(?<=\.)\s+|\n|$)", chunk_text[::-1])  # reverse search
+        if match:
+            boundary = len(chunk_text) - match.end(1)
+            # break at the found sentence boundary
+            final_chunk = chunk_text[:len(chunk_text)-boundary].strip()
+        else:
+            final_chunk = chunk_text.strip()
+
+        # If we can't find anything meaningful, fallback to regular cut
+        if not final_chunk:
+            final_chunk = " ".join(words[i:end]).strip()
+            chunk_len = len(final_chunk.split())
+        else:
+            chunk_len = len(final_chunk.split())
+
+        chunk_title = title if i == 0 else f"{title} (cont. {len(chunks) + 1})"
+        chunks.append((chunk_title, final_chunk))
+        i += chunk_len
+
     return chunks
+
 
 def is_likely_heading(text, font_size, avg_body_size, next_sizes):
     # Heuristics
